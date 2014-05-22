@@ -108,7 +108,7 @@
 	var localTime = new Date();
 	var or = new Date();
 	var ora = or.getHours();
-	
+	var min = or.getMinutes();
 	
 	function scaleMe(data) 
 	{
@@ -228,6 +228,7 @@
 							//var startValue= processed.earliest;
 							localTime = processed.earliest;
 							localTime.setHours(ora);
+							localTime.setMinutes(min);
 							var startValue = localTime;
 							swooshTo(startValue)
 						});	

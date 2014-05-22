@@ -1,0 +1,239 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-GB" lang="en-GB">
+<head profile="http://dublincore.org/documents/dcq-html/">
+<script src="/wp-content/myscripts/glow/1.7.7/core/core.js" type="text/javascript"></script>
+<script src="/wp-content/myscripts/glow/1.7.7/widgets/widgets.js" type="text/javascript"></script>
+<link href="/wp-content/myscripts/glow/1.7.7/widgets/widgets.css" type="text/css" rel="stylesheet" />
+<style type="text/css">
+#myTimetableC 
+{
+	width: 921px;
+	height: 300px;
+	position:absolute;
+} 
+#myTimetableC h2 
+{
+	padding: 0 1px;
+	margin: 0;
+	height: 60px;
+	color: #FE642E;
+}
+#myTimetableC .timetable-item 
+{
+	font-weight: bold;
+	padding: 15px 10px;
+	font-size: 0.8em;
+}
+#myTimetableC .timetable-header-holder 
+{
+	width: 0px;
+	height: 0px;
+}
+#myTimetableC .timetable-scale 
+{
+	background: #585858;
+}
+#myTimetableC .timetable-scaleItem 
+{
+	font-color: #00ff00;
+	font-size: 1.2em;
+}
+#controlTools div.control 
+{
+	float: left;
+}
+#controlTools div.label 
+{
+	color:#ffffff;
+	font-size: 1.2em;
+	position:relative;
+	top:300px;
+	height: 30px;
+	padding: 24px 15px 5px 0;
+}
+#controlTools div.button {
+	color:#ffffff;
+	position:relative;
+	top:300px;
+	margin: 19px 8px 0 0;
+	padding: 5px 10px;
+	background: #585858;
+	border: 2px solid #000000;
+	cursor: pointer;
+}
+#controlTools:after {
+	content: ".";
+	display: block;
+	clear: both;
+	visibility: hidden;
+	line-height: 0;
+	height: 0;
+}
+#clock 
+{
+	position:relative;
+	top:250px;
+	left: 700px;
+	width: 200px;
+	height: 48px;
+}
+#clockLabel
+{
+	color:#ffffff;
+	font-size: 1.1em;
+	position:relative;
+	top:215px;
+	left: 570px;
+	width: 130px;
+	height: 20px;
+}
+</style>
+</head>
+<body>
+<div id="myTimetableC"></div>
+<div id="controlTools">
+	<div class="control label" id="quickLabel">Quick find:</div>
+	<div class="control button" id="LocTimeButt">Now on Your Channels</div>
+</div>
+<div id="clock">
+	<iframe src="http://free.timeanddate.com/clock/i45u5phr/n78/tlie/fs15/fcfff/tc585858/bas2/tt0/tw1/tm1/td1/ts1/tb4" frameborder="0" width="200" height="48"></iframe>
+</div>
+<div id="clockLabel" width="200" height="50">
+	Local Irish Time: 
+</div>
+<script type="text/javascript">
+(function () 
+{
+	//variables for the LocalTime buttun
+	var localTime = new Date();
+	var or = new Date();
+	var ora = or.getHours();
+	
+	
+	function scaleMe(data) 
+	{
+		var start = data.start,
+			hours = Math.floor(start.valueOf() / 3600000) % 24,
+			ampm = ["am", "pm"][Math.floor(hours / 12)],
+			hh = ((hours - 24) % 12) + 12;
+		return hh + ampm;
+	}
+	function makeDate(sDate)
+	{
+		var adjusted = sDate.replace(/^([0-9]{1})-([0-9]{2})-([0-9]{3}).([0-9]{4}):([0-9]{5}):([0-9]{6})$/, "$1/$2/$3 $4:$5:$6");
+		return new Date(adjusted);
+	}
+	function process(netResponse) 
+	{
+		var list = netResponse.json().blocklist,
+			i = list.length,
+			services = {},
+			programmes = null,
+			latest = new Date(0),
+			earliest = new Date("2099/12/31 23:59:59"),
+			thisStart = null,
+			thisEnd = null,
+			thisService = null;
+		// grab required tracks and transform items
+		while (i--) 
+		{
+			thisService = list[i].service;
+			services[thisService] = services[thisService] || {title: list[i].service_title, programmes: []};
+			programmes = services[thisService].programmes;
+			thisStart = makeDate(list[i].start);
+			thisEnd = makeDate(list[i].end);
+			// deduce required Timetable end points
+			if(thisStart.valueOf() < earliest.valueOf()) 
+			{
+				earliest = thisStart;
+			}
+			if(thisEnd.valueOf() > latest.valueOf()) 
+			{
+				latest = thisEnd;
+			}
+			programmes[programmes.length] = [
+				list[i].emp_title,
+				thisStart,
+				thisEnd
+			];
+		}
+		// deduce required Timetable view points
+		var viewStart = new Date(earliest.valueOf() + 5 * 60 * 60 * 1000),
+			viewEnd = new Date(earliest.valueOf() + 6 * 60 * 60 * 1000),
+			tracks = []
+			trackSize = 200;
+		// transform grabbed tracks
+		for(var id in services) 
+		{
+			tracks[tracks.length] = [services[id].title, trackSize, {items: services[id].programmes}];
+		}
+		// disable all tracks but the first 4. tracks[j][2] is the options object
+		// this is so we have something that fits the page
+		for(var j =3, len = tracks.length; j < len; j++) 
+		{
+			tracks[j][2].disabled = true;
+		}
+		return{
+			tracks: tracks,
+			earliest: earliest,
+			latest: latest,
+			viewStart: viewStart,
+			viewEnd: viewEnd
+		};			
+	}
+		glow.ready(function () {			
+		// Timetable creation with Json file
+				glow.net.get("YourJson.json", {onLoad: 	function (response) 
+				{
+					 var processed = process(response),
+						myTimetable = new glow.widgets.Timetable("#myTimetableC",
+							processed.earliest, processed.latest,
+							processed.viewStart, processed.viewEnd,
+							{
+								keepItemContentInView: true,
+								vertical: false,
+								size: 900,
+								tracks: processed.tracks
+							}
+						).setBanding("hour")
+						 .addScale("hour", "left", 40, {template: scaleMe})
+						 .addScrollbar("hour", "right", 40, {template: scaleMe})
+						 .setTrackHeaderTemplate("<h2>{title}</h2>")
+						 .draw();							 
+						// handler for the quick focus buttons
+						function swooshTo(hour) 
+						{
+						// create the Animation and calculate the start and end points
+							var an = new glow.anim.Animation(2, {tween: glow.tweens.easeOut(4)}),
+								start = myTimetable.currentPosition(),
+								end = hour,
+								range = myTimetable.viewRange(),
+								rangeSize = range.end - range.start;		
+							if((end + rangeSize) > myTimetable.end) 
+							{
+								end = myTimetable.end - rangeSize;
+							}		
+							// attach the frame event handler, so that the Animation does something
+							glow.events.addListener(an, "frame", function(event)
+							{	
+								var tempHour =end ;
+								myTimetable.currentPosition(tempHour);
+							});		
+							// run it!
+							an.start();	
+						}
+						// Quick focus buttons
+						glow.events.addListener("#LocTimeButt", "click", function(event)
+						{
+							//var startValue= processed.earliest;
+							localTime = processed.earliest;
+							localTime.setHours(ora);
+							var startValue = localTime;
+							swooshTo(startValue)
+						});	
+				}});			
+	})
+})();
+</script>
+</body>
+</html>
